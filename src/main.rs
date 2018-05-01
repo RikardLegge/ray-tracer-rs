@@ -85,19 +85,19 @@ impl App {
         use graphics::*;
 
         let line_segments = [
-//            vec!([100.0, 100.0, 100.0, 200.0], [100.0, 200.0, 200.0, 100.0], [200.0, 100.0, 100.0, 100.0]),
-//            vec!([700.0, 300.0, 700.0, 400.0]),
+            vec!([100.0, 100.0, 100.0, 200.0], [100.0, 200.0, 200.0, 100.0], [200.0, 100.0, 100.0, 100.0]),
+            vec!([700.0, 300.0, 700.0, 400.0]),
 //            vec!([300.0, 100.0,500.0, 100.0]),
 //            vec!([300.0, 700.0, 500.0, 700.0]),
 //            vec!([350.0, 600.0, 500.0, 600.0]),
 //            vec!([500.0, 300.0, 500.0, 400.0], [500.0, 400.0, 600.0, 300.0]),
 //            vec!([100.0, 400.0, 200.0, 400.0], [200.0, 400.0, 200.0, 500.0]),
 //            vec!([100.0, 700.0, 200.0, 600.0], [200.0, 600.0, 100.0, 600.0]),
-            vec!([400.0, 100.0, 400.0, 500.0]),
+//            vec!([400.0, 100.0, 400.0, 500.0]),
 
 //                rect_to_lines(&rectangle::square(500.0, 200.0, 100.0)),
-//            rect_to_lines(&rectangle::square(50.0, 50.0, 700.0)),
-//            rect_to_lines(&rectangle::square(300.0, 300.0, 100.0)),
+            rect_to_lines(&rectangle::square(50.0, 50.0, 700.0)),
+            rect_to_lines(&rectangle::square(300.0, 300.0, 100.0)),
         ].to_vec();
         let time = self.time;
         let ray_tracer = RayTracer {};
@@ -106,8 +106,8 @@ impl App {
         self.gl.draw(args.viewport(), |c, gl| {
 //            light_source[1] = 400.0 - (time / 100.0).sin() * 50.0;
 //            light_source[0] = 400.0 + (time / 66.0).sin() * 50.0;
-//            light_source[0] = 400.0 + (time / 100.0).sin().powi(3) * 400.0;
-//            light_source[1] = 400.0 - (time / 100.0).sin() * 400.0;
+            light_source[0] = 410.0 + (time / 100.0).sin().powi(3) * 400.0;
+            light_source[1] = 410.0 - (time / 100.0).sin() * 400.0;
 
             let transform = c.transform;
 

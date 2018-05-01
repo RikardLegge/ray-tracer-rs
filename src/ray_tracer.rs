@@ -163,34 +163,29 @@ impl RayTracer {
 
                 if hit.relative_distance > 1.0 - EPSILON && hits.len() > 1 {
                     let cast_another_ray = {
-                        if i == 0 && is_closed {
-                            let pp = points.last().unwrap();
-                            let pn = points[i + 1];
-                            let vec_p = vec2_normalized([point[0] - pp[0], point[1] - pp[1]]);
-                            let vec_n = vec2_normalized([point[0] - pn[0], point[1] - pn[1]]);
-                            let vec_s = vec2_normalized([point[0] - source[0], point[1] - source[1]]);
-
-                            let dot = vec_p[0] * vec_n[0] + vec_p[1] * vec_n[1];
-                            let dot_p = vec_p[0] * vec_s[0] + vec_p[1] * vec_s[1];
-                            let dot_n = vec_n[0] * vec_s[0] + vec_n[1] * vec_s[1];
-
-                            dot_n * dot_p < dot.abs()
-                        }
-
-                        else if i != 0 && i != points.len() - 1 {
-                            let pp = points[i - 1];
-                            let pn = points[i + 1];
-                            let vec_p = vec2_normalized([point[0] - pp[0], point[1] - pp[1]]);
-                            let vec_n = vec2_normalized([point[0] - pn[0], point[1] - pn[1]]);
-                            let vec_s = vec2_normalized([point[0] - source[0], point[1] - source[1]]);
-
-                            let dot = vec_p[0] * vec_n[0] + vec_p[1] * vec_n[1];
-                            let dot_p = vec_p[0] * vec_s[0] + vec_p[1] * vec_s[1];
-                            let dot_n = vec_n[0] * vec_s[0] + vec_n[1] * vec_s[1];
-
-                            dot_n * dot_p < dot.abs()
-                        } else {
+                        if (i == 0 || i == points.len() - 1) && !is_closed {
                             true
+                        } else {
+                            let (pp, pn) = {
+                                if i == 0 {
+                                    let pp = points[points.len() - 2];
+                                    let pn = points[i + 1];
+                                    (pp, pn)
+                                } else {
+                                    let pp = points[i - 1];
+                                    let pn = points[i + 1];
+                                    (pp,pn)
+                                }
+                            };
+                            let vec_p = vec2_normalized([point[0] - pp[0], point[1] - pp[1]]);
+                            let vec_n = vec2_normalized([point[0] - pn[0], point[1] - pn[1]]);
+                            let vec_s = vec2_normalized([point[0] - source[0], point[1] - source[1]]);
+
+                            let dot = vec_p[0] * vec_n[0] + vec_p[1] * vec_n[1];
+                            let dot_p = vec_p[0] * vec_s[0] + vec_p[1] * vec_s[1];
+                            let dot_n = vec_n[0] * vec_s[0] + vec_n[1] * vec_s[1];
+
+                            dot_n * dot_p < dot.abs()
                         }
                     };
 
