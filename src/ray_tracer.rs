@@ -96,8 +96,8 @@ impl RayTracer {
                         None
                     } else if r_dx == 0.0 {
                         if (r_px - s_px).abs() < EPSILON {
-                            let dist_self = (s_py - r_py).abs();
-                            let dist_other = (s_py + s_dy - r_py).abs();
+                            let dist_self = (s_py - r_py).abs()/r_dy;
+                            let dist_other = (s_py + s_dy - r_py).abs()/r_dy;
                             if s_dx == 0.0 && dist_other < dist_self {
                                 Some(([r_px, s_py + s_dy],dist_other))
                             } else {
@@ -108,8 +108,8 @@ impl RayTracer {
                         }
                     } else if r_dy == 0.0 {
                         if (r_py - s_py).abs() < EPSILON {
-                            let dist_self = (s_px - r_px).abs();
-                            let dist_other = (s_px + s_dx - r_px).abs();
+                            let dist_self = (s_px - r_px).abs()/r_dx;
+                            let dist_other = (s_px + s_dx - r_px).abs()/r_dx;
                             if s_dx == 0.0 && dist_other < dist_self {
                                 Some(([r_px + s_dx, s_py], dist_other))
                             } else {
@@ -157,6 +157,7 @@ impl RayTracer {
             let is_closed = line_strip.is_closed;
             for (i, point) in points.iter().enumerate().filter(|&(i, _)| !(is_closed && i == points.len()-1)) {
                 let hits = self.trace_ray(&source, &point, &line_strips);
+                if hits.len() == 0 {continue;}
                 let hit = hits.first().unwrap();
                 let hit_point = [hit.point[0], hit.point[1]];
 
