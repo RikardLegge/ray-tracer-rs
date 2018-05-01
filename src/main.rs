@@ -10,17 +10,12 @@ use piston::input::*;
 use glutin_window::GlutinWindow as Window;
 use opengl_graphics::{GlGraphics, OpenGL};
 
-//use graphics::polygon::Polygon;
-
 mod ray_tracer;
 
 use ray_tracer::{RayTracer, line_segments_to_line_strips};
 
 pub struct App {
-    gl: GlGraphics,
-    // OpenGL drawing backend.
-    rotation: f64,   // Rotation for the square.
-
+    gl: GlGraphics,     // OpenGL drawing backend.
     time: f64,
 }
 
@@ -90,10 +85,10 @@ impl App {
 //            vec!([300.0, 100.0,500.0, 100.0]),
 //            vec!([300.0, 700.0, 500.0, 700.0]),
 //            vec!([350.0, 600.0, 500.0, 600.0]),
-//            vec!([500.0, 300.0, 500.0, 400.0], [500.0, 400.0, 600.0, 300.0]),
-//            vec!([100.0, 400.0, 200.0, 400.0], [200.0, 400.0, 200.0, 500.0]),
-//            vec!([100.0, 700.0, 200.0, 600.0], [200.0, 600.0, 100.0, 600.0]),
-//            vec!([400.0, 100.0, 400.0, 500.0]),
+            vec!([500.0, 300.0, 500.0, 400.0], [500.0, 400.0, 600.0, 300.0]),
+            vec!([100.0, 400.0, 200.0, 400.0], [200.0, 400.0, 200.0, 500.0]),
+            vec!([100.0, 700.0, 200.0, 600.0], [200.0, 600.0, 100.0, 600.0]),
+            vec!([400.0, 100.0, 400.0, 500.0]),
 
 //                rect_to_lines(&rectangle::square(500.0, 200.0, 100.0)),
             rect_to_lines(&rectangle::square(50.0, 50.0, 700.0)),
@@ -121,7 +116,7 @@ impl App {
                 let target_ray = [light_source[0], light_source[1], target[0], target[1]];
                 line(BLUE, 1.0, target_ray, transform, gl);
 
-                if hit.is_first_hit {
+                if hit.ray_segment == 0 {
                     let hit_ray = [light_source[0], light_source[1], hit.point[0], hit.point[1]];
                     line(GREEN, 1.0, hit_ray, transform, gl);
                 } else {
@@ -161,12 +156,11 @@ impl App {
 //                line(PURPLE, 1.0, segment, transform, gl);
 //            }
         });
-        self.time += 1.0;
     }
 
     fn update(&mut self, args: &UpdateArgs) {
         // Rotate 2 radians per second.
-        self.rotation += 2.0 * args.dt;
+        self.time += 1.0;
     }
 }
 
@@ -187,7 +181,6 @@ fn main() {
     // Create a new game and run it.
     let mut app = App {
         gl: GlGraphics::new(opengl),
-        rotation: 0.0,
         time: 0.0,
     };
 

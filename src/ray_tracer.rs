@@ -1,30 +1,40 @@
-use vecmath::{Vector2, vec2_normalized};
+use vecmath::{vec2_normalized};
 use std::f64::consts::PI;
 
 pub struct RayTracer {}
 
-pub type Point = Vector2<f64>;
+pub type Point = [f64; 2];
 type LineSegment = [f64; 4];
+
+enum TracableType {
+    Rectangle,
+    Triangle,
+    Polygon
+}
+
+trait Tracable {
+
+}
 
 pub struct Hit<'a> {
     pub target_point: &'a Point,
     pub point: Point,
+    pub ray_segment: usize,
+
     strip_id: u32,
     segment_id: usize,
-    relative_distance: f64,
-
-    pub is_first_hit: bool
+    distance: f64,
 }
 
 impl<'a> Hit<'a> {
     pub fn copy(&self) -> Hit<'a> {
         let target_point = self.target_point;
-        let point = [self.point[0], self.point[1]];
+        let point = self.point;
         let strip_id = self.strip_id;
         let segment_id = self.segment_id;
-        let relative_distance = self.relative_distance;
-        let is_first_hit = self.is_first_hit;
-        Hit { point, strip_id, segment_id, relative_distance, target_point, is_first_hit }
+        let distance = self.distance;
+        let ray_segment = self.ray_segment;
+        Hit { point, strip_id, segment_id, distance, target_point, ray_segment }
     }
 }
 
@@ -134,10 +144,10 @@ impl RayTracer {
 
                 if let Some((point,distance)) = ray {
                     let hit = Hit {
-                        is_first_hit: true,
+                        ray_segment: 0,
                         target_point: target,
                         point: point,
-                        relative_distance: distance,
+                        distance: distance,
                         strip_id: id,
                         segment_id: i };
                     hits.push(hit);
@@ -145,7 +155,7 @@ impl RayTracer {
             }
         }
 
-        hits.sort_by(|a, b| a.relative_distance.partial_cmp(&b.relative_distance).unwrap());
+        hits.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
         hits
     }
 
@@ -156,12 +166,12 @@ impl RayTracer {
             let points = &line_strip.points;
             let is_closed = line_strip.is_closed;
             for (i, point) in points.iter().enumerate().filter(|&(i, _)| !(is_closed && i == points.len()-1)) {
-                let hits = self.trace_ray(&source, &point, &line_strips);
+                let hits = self.trace_ray(source, point, &line_strips);
                 if hits.len() == 0 {continue;}
                 let hit = hits.first().unwrap();
                 let hit_point = [hit.point[0], hit.point[1]];
 
-                if hit.relative_distance > 1.0 - EPSILON && hits.len() > 1 {
+                if hit.distance > 1.0 - EPSILON && hits.len() > 1 {
                     let cast_another_ray = {
                         if (i == 0 || i == points.len() - 1) && !is_closed {
                             true
@@ -199,7 +209,7 @@ impl RayTracer {
                             }
                             if dist > EPSILON {
                                 let mut hit = hit_2.copy();
-                                hit.is_first_hit = false;
+                                hit.ray_segment = 1;
                                 hit_points.push(hit);
                                 break;
                             }
@@ -271,4 +281,15 @@ impl RayTracer {
         hit_points_angle.into_iter()
             .map(|point| point.0).collect::<Vec<&'a Hit<'a>>>()
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+//    #[test]
+//    fn outer_box() {
+//        let rt = RayTracer {};
+//        let a = rt.trace(&[100.0, 100.0], &[100.0, 100.0]);
+//    }
 }
