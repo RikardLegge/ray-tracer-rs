@@ -1,27 +1,30 @@
 use vecmath::{Vector2, vec2_normalized};
-use std::f64::consts::SQRT_2;
 use std::f64::consts::PI;
-//use std::f64::INFINITY;
 
 pub struct RayTracer {}
 
 pub type Point = Vector2<f64>;
 type LineSegment = [f64; 4];
 
-pub struct Hit {
+pub struct Hit<'a> {
+    pub target_point: &'a Point,
     pub point: Point,
-    pub strip_id: u32,
+    strip_id: u32,
     segment_id: usize,
     relative_distance: f64,
+
+    pub is_first_hit: bool
 }
 
-impl Hit {
-    pub fn copy(&self) -> Hit {
+impl<'a> Hit<'a> {
+    pub fn copy(&self) -> Hit<'a> {
+        let target_point = self.target_point;
         let point = [self.point[0], self.point[1]];
         let strip_id = self.strip_id;
         let segment_id = self.segment_id;
         let relative_distance = self.relative_distance;
-        Hit { point, strip_id, segment_id, relative_distance }
+        let is_first_hit = self.is_first_hit;
+        Hit { point, strip_id, segment_id, relative_distance, target_point, is_first_hit }
     }
 }
 
@@ -33,7 +36,7 @@ pub struct LineStrip {
 
 const EPSILON: f64 = 1e-8;
 
-fn line_segments_to_line_strips(line_segment_lists: &Vec<Vec<LineSegment>>) -> Vec<LineStrip> {
+pub fn line_segments_to_line_strips(line_segment_lists: &Vec<Vec<LineSegment>>) -> Vec<LineStrip> {
     let mut id = 0;
     line_segment_lists.iter().map(|line_segment_list| {
         let mut points = Vec::with_capacity(line_segment_list.len() + 1);
@@ -67,11 +70,11 @@ fn angle_between(a: f64, b: f64) -> f64 {
 }
 
 impl RayTracer {
-    fn trace_ray(&self, ray: &LineSegment, line_strips: &Vec<LineStrip>) -> Vec<Hit> {
-        let r_px = ray[0];
-        let r_py = ray[1];
-        let r_dx = ray[2] - r_px;
-        let r_dy = ray[3] - r_py;
+    fn trace_ray<'a>(&self, source: &Point, target: &'a Point, line_strips: &'a Vec<LineStrip>) -> Vec<Hit<'a>> {
+        let r_px = source[0];
+        let r_py = source[1];
+        let mut r_dx = target[0] - r_px;
+        let mut r_dy = target[1] - r_py;
 
         let mut hits = Vec::new();
 
@@ -88,16 +91,57 @@ impl RayTracer {
                 let s_dy = segment[1] - s_py;
                 last_point = [segment[0], segment[1]];
 
-                let t2 = (r_dx * (s_py - r_py) + r_dy * (r_px - s_px)) / (s_dx * r_dy - s_dy * r_dx);
-                let t1 = (s_px + s_dx * t2 - r_px) / r_dx;
+                let ray = {
+                    if r_dx == 0.0 && r_dy == 0.0 {
+                        None
+                    } else if r_dx == 0.0 {
+                        if (r_px - s_px).abs() < EPSILON {
+                            let dist_self = (s_py - r_py).abs();
+                            let dist_other = (s_py + s_dy - r_py).abs();
+                            if s_dx == 0.0 && dist_other < dist_self {
+                                Some(([r_px, s_py + s_dy],dist_other))
+                            } else {
+                                Some(([r_px, s_py],dist_self))
+                            }
+                        } else {
+                            None
+                        }
+                    } else if r_dy == 0.0 {
+                        if (r_py - s_py).abs() < EPSILON {
+                            let dist_self = (s_px - r_px).abs();
+                            let dist_other = (s_px + s_dx - r_px).abs();
+                            if s_dx == 0.0 && dist_other < dist_self {
+                                Some(([r_px + s_dx, s_py], dist_other))
+                            } else {
+                                Some(([r_px, s_py],dist_self))
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        let t2 = (r_dx * (s_py - r_py) + r_dy * (r_px - s_px)) / (s_dx * r_dy - s_dy * r_dx);
+                        let t1 = (s_px + s_dx * t2 - r_px) / r_dx;
 
-                if t1 < 0.0 || !(t1 >= 0.0) || t2 < -EPSILON || t2 > 1.0 + EPSILON {
-                    continue;
+                        if t1 < 0.0 || !(t1 >= 0.0) || t2 < -EPSILON || t2 > 1.0 + EPSILON {
+                            None
+                        } else {
+                            let x = s_px + s_dx * t2;
+                            let y = s_py + s_dy * t2;
+                            Some(([x, y], t1))
+                        }
+                    }
+                };
+
+                if let Some((point,distance)) = ray {
+                    let hit = Hit {
+                        is_first_hit: true,
+                        target_point: target,
+                        point: point,
+                        relative_distance: distance,
+                        strip_id: id,
+                        segment_id: i };
+                    hits.push(hit);
                 }
-
-                let x = s_px + s_dx * t2;
-                let y = s_py + s_dy * t2;
-                hits.push(Hit { point: [x, y], relative_distance: t1, strip_id: id, segment_id: i });
             }
         }
 
@@ -105,24 +149,34 @@ impl RayTracer {
         hits
     }
 
-    pub fn trace(&self, source: &Point, line_segment_lists: &Vec<Vec<LineSegment>>) -> Vec<(Hit, Point, bool)> {
-        let line_strips = line_segments_to_line_strips(line_segment_lists);
+    pub fn trace<'a>(&self, source: &Point, line_strips: &'a Vec<LineStrip>) -> Vec<Hit<'a>> {
         let mut hit_points = Vec::new();
 
         for line_strip in line_strips.iter() {
             let points = &line_strip.points;
-            let skip = line_strip.is_closed;
-            for (i, point) in points.iter().enumerate().filter(|&(i, _)| !(skip && i == points.len()-1)) {
-                let point_cpy = [point[0], point[1]];
-
-                let ray = [source[0], source[1], point[0], point[1]];
-                let hits = self.trace_ray(&ray, &line_strips);
+            let is_closed = line_strip.is_closed;
+            for (i, point) in points.iter().enumerate().filter(|&(i, _)| !(is_closed && i == points.len()-1)) {
+                let hits = self.trace_ray(&source, &point, &line_strips);
                 let hit = hits.first().unwrap();
                 let hit_point = [hit.point[0], hit.point[1]];
 
                 if hit.relative_distance > 1.0 - EPSILON && hits.len() > 1 {
                     let cast_another_ray = {
-                        if i != 0 && i != points.len() - 1 {
+                        if i == 0 && is_closed {
+                            let pp = points.last().unwrap();
+                            let pn = points[i + 1];
+                            let vec_p = vec2_normalized([point[0] - pp[0], point[1] - pp[1]]);
+                            let vec_n = vec2_normalized([point[0] - pn[0], point[1] - pn[1]]);
+                            let vec_s = vec2_normalized([point[0] - source[0], point[1] - source[1]]);
+
+                            let dot = vec_p[0] * vec_n[0] + vec_p[1] * vec_n[1];
+                            let dot_p = vec_p[0] * vec_s[0] + vec_p[1] * vec_s[1];
+                            let dot_n = vec_n[0] * vec_s[0] + vec_n[1] * vec_s[1];
+
+                            dot_n * dot_p < dot.abs()
+                        }
+
+                        else if i != 0 && i != points.len() - 1 {
                             let pp = points[i - 1];
                             let pn = points[i + 1];
                             let vec_p = vec2_normalized([point[0] - pp[0], point[1] - pp[1]]);
@@ -135,10 +189,6 @@ impl RayTracer {
 
                             dot_n * dot_p < dot.abs()
                         } else {
-//                            let pf = points.first().unwrap();
-//                            let pl = points.last().unwrap();
-//                            let dist = (pf[0] - pl[0]).powi(2) + (pf[1] - pl[1]).powi(2);
-//                            dist > EPSILON
                             true
                         }
                     };
@@ -152,29 +202,31 @@ impl RayTracer {
                                 break;
                             }
                             if dist > EPSILON {
-                                hit_points.push((hit_2.copy(), point_cpy, false));
+                                let mut hit = hit_2.copy();
+                                hit.is_first_hit = false;
+                                hit_points.push(hit);
                                 break;
                             }
                         }
                     }
                 }
-                hit_points.push((hit.copy(), point_cpy, true));
+                hit_points.push(hit.copy());
             }
         }
         hit_points
     }
 
-    pub fn sort_hits<'a>(&self, source: &Point, hit_points: &'a Vec<(Hit, Point, bool)>) -> Vec<&'a (Hit, Point, bool)> {
+    pub fn sort_hits<'a>(&self, source: &Point, hit_points: &'a Vec<Hit<'a>>) -> Vec<&'a Hit<'a>> {
         let mut hit_points_angle = hit_points.iter().map(|point| {
-            let dx = point.0.point[0] - source[0];
-            let dy = point.0.point[1] - source[1];
+            let dx = point.point[0] - source[0];
+            let dy = point.point[1] - source[1];
             let angle: f64 = dy.atan2(dx) + PI;
             return (point, angle);
-        }).collect::<Vec<(&(Hit, [f64; 2], bool), f64)>>();
+        }).collect::<Vec<(&'a Hit<'a>, f64)>>();
         hit_points_angle.sort_by(|a, b| {
             let diff = (a.1 - b.1).abs();
             if diff < EPSILON {
-                (b.0).0.segment_id.cmp(&(a.0).0.segment_id)
+                b.0.segment_id.cmp(&a.0.segment_id)
             } else {
                 b.1.partial_cmp(&a.1).unwrap()
             }
@@ -191,9 +243,9 @@ impl RayTracer {
                 let point_1 = hit_points_angle[i1];
                 let point_2 = hit_points_angle[i2];
 
-                let hit = &(point.0).0;
-                let hit_1 = &(point_1.0).0;
-                let hit_2 = &(point_2.0).0;
+                let hit = &point.0;
+                let hit_1 = &point_1.0;
+                let hit_2 = &point_2.0;
 
                 let dist = angle_between(point_1.1, point_2.1).abs();
                 if dist < EPSILON {
@@ -221,6 +273,6 @@ impl RayTracer {
         }
 
         hit_points_angle.into_iter()
-            .map(|point| point.0).collect()
+            .map(|point| point.0).collect::<Vec<&'a Hit<'a>>>()
     }
 }

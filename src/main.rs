@@ -14,7 +14,7 @@ use opengl_graphics::{GlGraphics, OpenGL};
 
 mod ray_tracer;
 
-use ray_tracer::RayTracer;
+use ray_tracer::{RayTracer, line_segments_to_line_strips};
 
 pub struct App {
     gl: GlGraphics,
@@ -84,43 +84,44 @@ impl App {
     fn render(&mut self, args: &RenderArgs) {
         use graphics::*;
 
-        let line_strips = [
-            vec!([100.0, 100.0, 100.0, 200.0], [100.0, 200.0, 200.0, 100.0], [200.0, 100.0, 100.0, 100.0]),
-//            vec!([100.0, 300.0, 100.0, 400.0], [100.0, 400.0, 200.0, 300.0]),
-//            vec!([100.0, 300.0, 300.0, 300.0]),
-            vec!([700.0, 300.0, 700.0, 400.0]),
-            vec!([300.0, 100.0,500.0, 100.0]),
-            vec!([300.0, 700.0, 500.0, 700.0]),
-            vec!([350.0, 600.0, 500.0, 600.0]),
-            vec!([500.0, 300.0, 500.0, 400.0], [500.0, 400.0, 600.0, 300.0]),
-
-            vec!([100.0, 400.0, 200.0, 400.0], [200.0, 400.0, 200.0, 500.0]),
-            vec!([100.0, 700.0, 200.0, 600.0], [200.0, 600.0, 100.0, 600.0]),
+        let line_segments = [
+//            vec!([100.0, 100.0, 100.0, 200.0], [100.0, 200.0, 200.0, 100.0], [200.0, 100.0, 100.0, 100.0]),
+//            vec!([700.0, 300.0, 700.0, 400.0]),
+//            vec!([300.0, 100.0,500.0, 100.0]),
+//            vec!([300.0, 700.0, 500.0, 700.0]),
+//            vec!([350.0, 600.0, 500.0, 600.0]),
+//            vec!([500.0, 300.0, 500.0, 400.0], [500.0, 400.0, 600.0, 300.0]),
+//            vec!([100.0, 400.0, 200.0, 400.0], [200.0, 400.0, 200.0, 500.0]),
+//            vec!([100.0, 700.0, 200.0, 600.0], [200.0, 600.0, 100.0, 600.0]),
+            vec!([400.0, 100.0, 400.0, 500.0]),
 
 //                rect_to_lines(&rectangle::square(500.0, 200.0, 100.0)),
-            rect_to_lines(&rectangle::square(50.0, 50.0, 700.0)),
+//            rect_to_lines(&rectangle::square(50.0, 50.0, 700.0)),
+//            rect_to_lines(&rectangle::square(300.0, 300.0, 100.0)),
         ].to_vec();
         let time = self.time;
         let ray_tracer = RayTracer {};
-        let mut light_source = [700.0, 100.0];
+        let mut light_source = [400.0, 400.0];
 
         self.gl.draw(args.viewport(), |c, gl| {
+//            light_source[1] = 400.0 - (time / 100.0).sin() * 50.0;
+//            light_source[0] = 400.0 + (time / 66.0).sin() * 50.0;
+//            light_source[0] = 400.0 + (time / 100.0).sin().powi(3) * 400.0;
 //            light_source[1] = 400.0 - (time / 100.0).sin() * 400.0;
-//            light_source[0] = 400.0 + (time / 66.0).sin() * 400.0;
-            light_source[0] = 400.0 + (time / 100.0).sin().powi(2) * 349.0;
-            light_source[1] = 400.0 - (time / 100.0).sin() * 349.0;
 
             let transform = c.transform;
 
             clear(WHITE, gl);
 
+            let line_strips = line_segments_to_line_strips(&line_segments);
             let hit_points = ray_tracer.trace(&light_source, &line_strips);
 
-            for &(ref hit, ref target, first_hit) in &hit_points {
+            for hit in &hit_points {
+                let target  = hit.target_point;
                 let target_ray = [light_source[0], light_source[1], target[0], target[1]];
                 line(BLUE, 1.0, target_ray, transform, gl);
 
-                if first_hit {
+                if hit.is_first_hit {
                     let hit_ray = [light_source[0], light_source[1], hit.point[0], hit.point[1]];
                     line(GREEN, 1.0, hit_ray, transform, gl);
                 } else {
@@ -129,36 +130,36 @@ impl App {
                 }
             }
 
-            for line_strip in line_strips {
+            for line_strip in line_segments {
                 for segment in line_strip {
                     line(BLACK, 1.0, segment, transform, gl);
                 }
             }
 
             let sorted_hit_points = ray_tracer.sort_hits(&light_source, &hit_points);
-            let polygon_points = sorted_hit_points.iter().map(|hit| (hit.0).point).collect::<Vec<[f64; 2]>>();
+            let polygon_points = sorted_hit_points.iter().map(|hit| hit.point).collect::<Vec<[f64; 2]>>();
 
-            let first_point = polygon_points.first().unwrap();
-            let mut last_point = first_point;
-            for point in polygon_points.iter().skip(1) {
-                let triangle = [
-                    light_source,
-                    [last_point[0], last_point[1]],
-                    [point[0], point[1]],
-                ];
-                last_point = &point;
-                polygon(GRAY, &triangle, transform, gl);
-            }
-            let triangle = [
-                light_source,
-                [last_point[0], last_point[1]],
-                [first_point[0], first_point[1]],
-            ];
-            polygon(GRAY, &triangle, transform, gl);
+//            let first_point = polygon_points.first().unwrap();
+//            let mut last_point = first_point;
+//            for point in polygon_points.iter().skip(1) {
+//                let triangle = [
+//                    light_source,
+//                    [last_point[0], last_point[1]],
+//                    [point[0], point[1]],
+//                ];
+//                last_point = &point;
+//                polygon(GRAY, &triangle, transform, gl);
+//            }
+//            let triangle = [
+//                light_source,
+//                [last_point[0], last_point[1]],
+//                [first_point[0], first_point[1]],
+//            ];
+//            polygon(GRAY, &triangle, transform, gl);
 
-            for segment in polygon_to_lines(&polygon_points[..]) {
-                line(PURPLE, 1.0, segment, transform, gl);
-            }
+//            for segment in polygon_to_lines(&polygon_points[..]) {
+//                line(PURPLE, 1.0, segment, transform, gl);
+//            }
         });
         self.time += 1.0;
     }
